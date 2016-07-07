@@ -65,14 +65,14 @@ Throughout this document, we will often refer to Scala/Java Datasets of `Row`s a
 
 The entry point into all functionality in Spark is the [`SparkSession`](api/scala/index.html#org.apache.spark.sql.SparkSession) class. To create a basic `SparkSession`, just use `SparkSession.builder()`:
 
-{% include_example init_session scala/org/apache/spark/examples/sql/RDDRelation.scala %}
+{% include_example init_session scala/org/apache/spark/examples/sql/SparkSQLExample.scala %}
 </div>
 
 <div data-lang="java" markdown="1">
 
 The entry point into all functionality in Spark is the [`SparkSession`](api/java/index.html#org.apache.spark.sql.SparkSession) class. To create a basic `SparkSession`, just use `SparkSession.builder()`:
 
-{% include_example init_session java/org/apache/spark/examples/sql/JavaSparkSQL.java %}
+{% include_example init_session java/org/apache/spark/examples/sql/JavaSparkSqlExample.java %}
 </div>
 
 <div data-lang="python"  markdown="1">
@@ -107,13 +107,7 @@ from a Hive table, or from [Spark data sources](#data-sources).
 
 As an example, the following creates a DataFrame based on the content of a JSON file:
 
-{% highlight scala %}
-val spark: SparkSession // An existing SparkSession.
-val df = spark.read.json("examples/src/main/resources/people.json")
-
-// Displays the content of the DataFrame to stdout
-df.show()
-{% endhighlight %}
+{% include_example create_df scala/org/apache/spark/examples/sql/SparkSQLExample.scala %}
 
 </div>
 
@@ -123,13 +117,7 @@ from a Hive table, or from [Spark data sources](#data-sources).
 
 As an example, the following creates a DataFrame based on the content of a JSON file:
 
-{% highlight java %}
-SparkSession spark = ...; // An existing SparkSession.
-Dataset<Row> df = spark.read().json("examples/src/main/resources/people.json");
-
-// Displays the content of the DataFrame to stdout
-df.show();
-{% endhighlight %}
+{% include_example create_df java/org/apache/spark/examples/sql/JavaSparkSqlExample.java %}
 
 </div>
 
@@ -176,110 +164,20 @@ Here we include some basic examples of structured data processing using Datasets
 
 <div class="codetabs">
 <div data-lang="scala"  markdown="1">
-{% highlight scala %}
-val spark: SparkSession // An existing SparkSession
-
-// Create the DataFrame
-val df = spark.read.json("examples/src/main/resources/people.json")
-
-// Show the content of the DataFrame
-df.show()
-// age  name
-// null Michael
-// 30   Andy
-// 19   Justin
-
-// Print the schema in a tree format
-df.printSchema()
-// root
-// |-- age: long (nullable = true)
-// |-- name: string (nullable = true)
-
-// Select only the "name" column
-df.select("name").show()
-// name
-// Michael
-// Andy
-// Justin
-
-// Select everybody, but increment the age by 1
-df.select(df("name"), df("age") + 1).show()
-// name    (age + 1)
-// Michael null
-// Andy    31
-// Justin  20
-
-// Select people older than 21
-df.filter(df("age") > 21).show()
-// age name
-// 30  Andy
-
-// Count people by age
-df.groupBy("age").count().show()
-// age  count
-// null 1
-// 19   1
-// 30   1
-{% endhighlight %}
+{% include_example untyped_ops scala/org/apache/spark/examples/sql/SparkSQLExample.scala %}
 
 For a complete list of the types of operations that can be performed on a Dataset refer to the [API Documentation](api/scala/index.html#org.apache.spark.sql.Dataset).
 
 In addition to simple column references and expressions, Datasets also have a rich library of functions including string manipulation, date arithmetic, common math operations and more. The complete list is available in the [DataFrame Function Reference](api/scala/index.html#org.apache.spark.sql.functions$).
-
-
 </div>
 
 <div data-lang="java" markdown="1">
-{% highlight java %}
-SparkSession spark = ...; // An existing SparkSession
 
-// Create the DataFrame
-Dataset<Row> df = spark.read().json("examples/src/main/resources/people.json");
-
-// Show the content of the DataFrame
-df.show();
-// age  name
-// null Michael
-// 30   Andy
-// 19   Justin
-
-// Print the schema in a tree format
-df.printSchema();
-// root
-// |-- age: long (nullable = true)
-// |-- name: string (nullable = true)
-
-// Select only the "name" column
-df.select("name").show();
-// name
-// Michael
-// Andy
-// Justin
-
-// Select everybody, but increment the age by 1
-df.select(df.col("name"), df.col("age").plus(1)).show();
-// name    (age + 1)
-// Michael null
-// Andy    31
-// Justin  20
-
-// Select people older than 21
-df.filter(df.col("age").gt(21)).show();
-// age name
-// 30  Andy
-
-// Count people by age
-df.groupBy("age").count().show();
-// age  count
-// null 1
-// 19   1
-// 30   1
-{% endhighlight %}
+{% include_example untyped_ops java/org/apache/spark/examples/sql/JavaSparkSqlExample.java %}
 
 For a complete list of the types of operations that can be performed on a Dataset refer to the [API Documentation](api/java/org/apache/spark/sql/Dataset.html).
 
 In addition to simple column references and expressions, Datasets also have a rich library of functions including string manipulation, date arithmetic, common math operations and more. The complete list is available in the [DataFrame Function Reference](api/java/org/apache/spark/sql/functions.html).
-
 </div>
 
 <div data-lang="python"  markdown="1">
@@ -402,19 +300,13 @@ In addition to simple column references and expressions, DataFrames also have a 
 <div data-lang="scala"  markdown="1">
 The `sql` function on a `SparkSession` enables applications to run SQL queries programmatically and returns the result as a `DataFrame`.
 
-{% highlight scala %}
-val spark = ... // An existing SparkSession
-val df = spark.sql("SELECT * FROM table")
-{% endhighlight %}
+{% include_example run_sql scala/org/apache/spark/examples/sql/SparkSQLExample.scala %}
 </div>
 
 <div data-lang="java" markdown="1">
 The `sql` function on a `SparkSession` enables applications to run SQL queries programmatically and returns the result as a `Dataset<Row>`.
 
-{% highlight java %}
-SparkSession spark = ... // An existing SparkSession
-Dataset<Row> df = spark.sql("SELECT * FROM table")
-{% endhighlight %}
+{% include_example run_sql java/org/apache/spark/examples/sql/JavaSparkSqlExample.java %}
 </div>
 
 <div data-lang="python"  markdown="1">
@@ -449,52 +341,13 @@ the bytes back into an object.
 <div class="codetabs">
 <div data-lang="scala"  markdown="1">
 
-{% highlight scala %}
-// Encoders for most common types are automatically provided by importing spark.implicits._
-val ds = Seq(1, 2, 3).toDS()
-ds.map(_ + 1).collect() // Returns: Array(2, 3, 4)
-
-// Encoders are also created for case classes.
-case class Person(name: String, age: Long)
-val ds = Seq(Person("Andy", 32)).toDS()
-
-// DataFrames can be converted to a Dataset by providing a class. Mapping will be done by name.
-val path = "examples/src/main/resources/people.json"
-val people = spark.read.json(path).as[Person]
-
-{% endhighlight %}
+{% include_example create_ds scala/org/apache/spark/examples/sql/SparkSQLExample.scala %}
 
 </div>
 
 <div data-lang="java" markdown="1">
 
-{% highlight java %}
-SparkSession spark = ... // An existing SparkSession
-
-// Encoders for most common types are provided in class Encoders.
-Dataset<Integer> ds = spark.createDataset(Arrays.asList(1, 2, 3), Encoders.INT());
-ds.map(new MapFunction<Integer, Integer>() {
-  @Override
-  public Integer call(Integer value) throws Exception {
-    return value + 1;
-  }
-}, Encoders.INT()); // Returns: [2, 3, 4]
-
-Person person = new Person();
-person.setName("Andy");
-person.setAge(32);
-
-// Encoders are also created for Java beans.
-Dataset<Person> ds = spark.createDataset(
-  Collections.singletonList(person),
-  Encoders.bean(Person.class)
-);
-
-// DataFrames can be converted to a Dataset by providing a class. Mapping will be done by name.
-String path = "examples/src/main/resources/people.json";
-Dataset<Person> people = spark.read().json(path).as(Encoders.bean(Person.class));
-{% endhighlight %}
-
+{% include_example create_ds java/org/apache/spark/examples/sql/JavaSparkSqlExample.java %}
 </div>
 </div>
 
@@ -521,38 +374,7 @@ reflection and become the names of the columns. Case classes can also be nested 
 types such as `Seq`s or `Array`s. This RDD can be implicitly converted to a DataFrame and then be
 registered as a table. Tables can be used in subsequent SQL statements.
 
-{% highlight scala %}
-val spark: SparkSession // An existing SparkSession
-// this is used to implicitly convert an RDD to a DataFrame.
-import spark.implicits._
-
-// Define the schema using a case class.
-// Note: Case classes in Scala 2.10 can support only up to 22 fields. To work around this limit,
-// you can use custom classes that implement the Product interface.
-case class Person(name: String, age: Int)
-
-// Create an RDD of Person objects and register it as a temporary view.
-val people = sc
-  .textFile("examples/src/main/resources/people.txt")
-  .map(_.split(","))
-  .map(p => Person(p(0), p(1).trim.toInt))
-  .toDF()
-people.createOrReplaceTempView("people")
-
-// SQL statements can be run by using the sql methods provided by spark.
-val teenagers = spark.sql("SELECT name, age FROM people WHERE age >= 13 AND age <= 19")
-
-// The columns of a row in the result can be accessed by field index:
-teenagers.map(t => "Name: " + t(0)).collect().foreach(println)
-
-// or by field name:
-teenagers.map(t => "Name: " + t.getAs[String]("name")).collect().foreach(println)
-
-// row.getValuesMap[T] retrieves multiple columns at once into a Map[String, T]
-teenagers.map(_.getValuesMap[Any](List("name", "age"))).collect().foreach(println)
-// Map("name" -> "Justin", "age" -> 19)
-{% endhighlight %}
-
+{% include_example schema_inferring scala/org/apache/spark/examples/sql/SparkSqlExample.scala %}
 </div>
 
 <div data-lang="java"  markdown="1">
@@ -564,68 +386,7 @@ does not support JavaBeans that contain `Map` field(s). Nested JavaBeans and `Li
 fields are supported though. You can create a JavaBean by creating a class that implements
 Serializable and has getters and setters for all of its fields.
 
-{% highlight java %}
-
-public static class Person implements Serializable {
-  private String name;
-  private int age;
-
-  public String getName() {
-    return name;
-  }
-
-  public void setName(String name) {
-    this.name = name;
-  }
-
-  public int getAge() {
-    return age;
-  }
-
-  public void setAge(int age) {
-    this.age = age;
-  }
-}
-
-{% endhighlight %}
-
-
-A schema can be applied to an existing RDD by calling `createDataFrame` and providing the Class object
-for the JavaBean.
-
-{% highlight java %}
-SparkSession spark = ...; // An existing SparkSession
-
-// Load a text file and convert each line to a JavaBean.
-JavaRDD<Person> people = spark.sparkContext.textFile("examples/src/main/resources/people.txt").map(
-  new Function<String, Person>() {
-    public Person call(String line) throws Exception {
-      String[] parts = line.split(",");
-
-      Person person = new Person();
-      person.setName(parts[0]);
-      person.setAge(Integer.parseInt(parts[1].trim()));
-
-      return person;
-    }
-  });
-
-// Apply a schema to an RDD of JavaBeans and register it as a table.
-Dataset<Row> schemaPeople = spark.createDataFrame(people, Person.class);
-schemaPeople.createOrReplaceTempView("people");
-
-// SQL can be run over RDDs that have been registered as tables.
-Dataset<Row> teenagers = spark.sql("SELECT name FROM people WHERE age >= 13 AND age <= 19")
-
-// The columns of a row in the result can be accessed by ordinal.
-List<String> teenagerNames = teenagers.map(new MapFunction<Row, String>() {
-  public String call(Row row) {
-    return "Name: " + row.getString(0);
-  }
-}).collectAsList();
-
-{% endhighlight %}
-
+{% include_example schema_inferring java/org/apache/spark/examples/sql/JavaSparkSqlExample.java %}
 </div>
 
 <div data-lang="python"  markdown="1">
@@ -679,43 +440,7 @@ a `DataFrame` can be created programmatically with three steps.
 by `SparkSession`.
 
 For example:
-{% highlight scala %}
-val spark: SparkSession // An existing SparkSession
-
-// Create an RDD
-val people = sc.textFile("examples/src/main/resources/people.txt")
-
-// The schema is encoded in a string
-val schemaString = "name age"
-
-// Import Row.
-import org.apache.spark.sql.Row;
-
-// Import Spark SQL data types
-import org.apache.spark.sql.types.{StructType, StructField, StringType};
-
-// Generate the schema based on the string of schema
-val schema = StructType(schemaString.split(" ").map { fieldName =>
-  StructField(fieldName, StringType, true)
-})
-
-// Convert records of the RDD (people) to Rows.
-val rowRDD = people.map(_.split(",")).map(p => Row(p(0), p(1).trim))
-
-// Apply the schema to the RDD.
-val peopleDataFrame = spark.createDataFrame(rowRDD, schema)
-
-// Creates a temporary view using the DataFrame.
-peopleDataFrame.createOrReplaceTempView("people")
-
-// SQL statements can be run by using the sql methods provided by spark.
-val results = spark.sql("SELECT name FROM people")
-
-// The columns of a row in the result can be accessed by field index or by field name.
-results.map(t => "Name: " + t(0)).collect().foreach(println)
-{% endhighlight %}
-
-
+{% include_example programmatic_schema scala/org/apache/spark/examples/sql/SparkSQLExample.scala %}
 </div>
 
 <div data-lang="java"  markdown="1">
@@ -732,62 +457,7 @@ a `Dataset<Row>` can be created programmatically with three steps.
 by `SparkSession`.
 
 For example:
-{% highlight java %}
-import org.apache.spark.api.java.function.Function;
-// Import factory methods provided by DataTypes.
-import org.apache.spark.sql.types.DataTypes;
-// Import StructType and StructField
-import org.apache.spark.sql.types.StructType;
-import org.apache.spark.sql.types.StructField;
-// Import Row.
-import org.apache.spark.sql.Row;
-// Import RowFactory.
-import org.apache.spark.sql.RowFactory;
-
-SparkSession spark = ...; // An existing SparkSession.
-JavaSparkContext sc = spark.sparkContext
-
-// Load a text file and convert each line to a JavaBean.
-JavaRDD<String> people = sc.textFile("examples/src/main/resources/people.txt");
-
-// The schema is encoded in a string
-String schemaString = "name age";
-
-// Generate the schema based on the string of schema
-List<StructField> fields = new ArrayList<>();
-for (String fieldName: schemaString.split(" ")) {
-  fields.add(DataTypes.createStructField(fieldName, DataTypes.StringType, true));
-}
-StructType schema = DataTypes.createStructType(fields);
-
-// Convert records of the RDD (people) to Rows.
-JavaRDD<Row> rowRDD = people.map(
-  new Function<String, Row>() {
-    public Row call(String record) throws Exception {
-      String[] fields = record.split(",");
-      return RowFactory.create(fields[0], fields[1].trim());
-    }
-  });
-
-// Apply the schema to the RDD.
-Dataset<Row> peopleDataFrame = spark.createDataFrame(rowRDD, schema);
-
-// Creates a temporary view using the DataFrame.
-peopleDataFrame.createOrReplaceTempView("people");
-
-// SQL can be run over a temporary view created using DataFrames.
-Dataset<Row> results = spark.sql("SELECT name FROM people");
-
-// The results of SQL queries are DataFrames and support all the normal RDD operations.
-// The columns of a row in the result can be accessed by ordinal.
-List<String> names = results.javaRDD().map(new Function<Row, String>() {
-  public String call(Row row) {
-    return "Name: " + row.getString(0);
-  }
-}).collect();
-
-{% endhighlight %}
-
+{% include_example programmatic_schema java/org/apache/spark/examples/sql/JavaSparkSqlExample.java %}
 </div>
 
 <div data-lang="python"  markdown="1">
