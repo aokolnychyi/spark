@@ -100,5 +100,7 @@ public enum TableCapability {
    * write modes, like {@link #TRUNCATE}, and {@link #OVERWRITE_BY_FILTER}, but cannot support
    * {@link #OVERWRITE_DYNAMIC}.
    */
+  // TODO: V1_BATCH_WRITE is not technically needed anymore but some tests fail otherwise.
+  // TODO: see how DataFrameWriter works for more details.
   V1_BATCH_WRITE
 }

@@ -15,20 +15,10 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.datasources.v2.parquet
+package org.apache.spark.sql.connector.distributions;
 
-import org.apache.spark.sql.connector.write.{LogicalWriteInfo, Write}
-import org.apache.spark.sql.execution.datasources.v2.FileWriteBuilder
-import org.apache.spark.sql.types.DataType
+import org.apache.spark.sql.connector.expressions.SortOrder;
 
-class ParquetWriteBuilder(
-    paths: Seq[String],
-    formatName: String,
-    supportsDataType: DataType => Boolean,
-    info: LogicalWriteInfo)
-  extends FileWriteBuilder(paths, formatName, supportsDataType, info) {
-
-  override def newFileWrite(): Write = {
-    new ParquetWrite(paths, info)
-  }
+public interface OrderedDistribution extends Distribution {
+  SortOrder[] ordering();
 }
