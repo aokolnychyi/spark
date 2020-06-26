@@ -14,20 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql.execution.datasources.v2.parquet
 
-import org.apache.spark.sql.connector.write.{LogicalWriteInfo, Write}
-import org.apache.spark.sql.execution.datasources.v2.FileWriteBuilder
-import org.apache.spark.sql.types.DataType
+package org.apache.spark.sql.connector.expressions;
 
-class ParquetWriteBuilder(
-    paths: Seq[String],
-    formatName: String,
-    supportsDataType: DataType => Boolean,
-    info: LogicalWriteInfo)
-  extends FileWriteBuilder(paths, formatName, supportsDataType, info) {
-
-  override def newFileWrite(): Write = {
-    new ParquetWrite(paths, info)
-  }
+public enum NullOrdering {
+  NULLS_FIRST, NULLS_LAST
 }
