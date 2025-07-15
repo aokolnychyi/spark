@@ -35,7 +35,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{ColumnDefinition, CreateTabl
 import org.apache.spark.sql.catalyst.types.DataTypeUtils
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.connector.catalog.{CatalogManager, SupportsNamespaces, TableCatalog}
-import org.apache.spark.sql.connector.catalog.CatalogV2Implicits.{CatalogHelper, MultipartIdentifierHelper, NamespaceHelper, TransformHelper}
+import org.apache.spark.sql.connector.catalog.CatalogV2Implicits.{CatalogHelper, IdentifierHelper, MultipartIdentifierHelper, NamespaceHelper, TransformHelper}
 import org.apache.spark.sql.connector.catalog.CatalogV2Util.v2ColumnsToStructType
 import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.execution.command.{ShowNamespacesCommand, ShowTablesCommand}
@@ -891,7 +891,13 @@ class Catalog(sparkSession: SparkSession) extends catalog.Catalog {
     // Note this is a no-op for the relation itself if it's not cached, but will clear all
     // caches referencing this relation. If this relation is cached as an InMemoryRelation,
     // this will clear the relation cache and caches of all its dependents.
-    sparkSession.sharedState.cacheManager.recacheByPlan(sparkSession, relation)
+    relation match {
+      case r: DataSourceV2Relation if r.catalog.isDefined && r.identifier.isDefined =>
+        val nameParts = r.identifier.get.toQualifiedNameParts(r.catalog.get)
+        sparkSession.sharedState.cacheManager.recacheByTableName(sparkSession, nameParts)
+      case _ =>
+        sparkSession.sharedState.cacheManager.recacheByPlan(sparkSession, relation)
+    }
   }
 
   /**

@@ -411,7 +411,9 @@ class Analyzer(override val catalogManager: CatalogManager) extends RuleExecutor
     Batch("Simple Sanity Check", Once,
       LookupFunctions),
     Batch("Keep Legacy Outputs", Once,
-      KeepLegacyOutputs)
+      KeepLegacyOutputs),
+    Batch("Unresolve Relations", Once,
+      new UnresolveTransactionRelations(catalogManager))
   )
 
   override def batches: Seq[Batch] = earlyBatches ++ Seq(
@@ -1199,6 +1201,9 @@ class Analyzer(override val catalogManager: CatalogManager) extends RuleExecutor
       case u: UnresolvedRelation =>
         resolveRelation(u).map(resolveViews(_, u.options)).getOrElse(u)
 
+      case r: TableReference =>
+        relationResolution.resolveReference(r)
+
       case r @ RelationTimeTravel(u: UnresolvedRelation, timestamp, version)
           if timestamp.forall(ts => ts.resolved && !SubqueryExpression.hasSubquery(ts)) =>
         val timeTravelSpec = TimeTravelSpec.create(timestamp, version, conf.sessionLocalTimeZone)
@@ -1682,7 +1687,7 @@ class Analyzer(override val catalogManager: CatalogManager) extends RuleExecutor
                 // The insert action is used when not matched, so its condition and value can only
                 // access columns from the source table.
                 val resolvedInsertCondition = insertCondition.map(
-                  resolveExpressionByPlanOutput(_, m.sourceTable))
+                  resolveExpressionByPlanOutput(_, m.source))
                 InsertAction(
                   resolvedInsertCondition,
                   resolveAssignments(assignments, m, MergeResolvePolicy.SOURCE))
@@ -1690,7 +1695,7 @@ class Analyzer(override val catalogManager: CatalogManager) extends RuleExecutor
                 // The insert action is used when not matched, so its condition and value can only
                 // access columns from the source table.
                 val resolvedInsertCondition = insertCondition.map(
-                  resolveExpressionByPlanOutput(_, m.sourceTable))
+                  resolveExpressionByPlanOutput(_, m.source))
                 val assignments = targetTable.output.map { attr =>
                   Assignment(attr, UnresolvedAttribute(Seq(attr.name)))
                 }
@@ -1793,15 +1798,15 @@ class Analyzer(override val catalogManager: CatalogManager) extends RuleExecutor
       assignments.map { assign =>
         val resolvedKey = assign.key match {
           case c if !c.resolved =>
-            resolveMergeExprOrFail(c, Project(Nil, mergeInto.targetTable))
+            resolveMergeExprOrFail(c, Project(Nil, mergeInto.table))
           case o => o
         }
         val resolvedValue = assign.value match {
           case c if !c.resolved =>
             val resolvePlan = resolvePolicy match {
               case MergeResolvePolicy.BOTH => mergeInto
-              case MergeResolvePolicy.SOURCE => Project(Nil, mergeInto.sourceTable)
-              case MergeResolvePolicy.TARGET => Project(Nil, mergeInto.targetTable)
+              case MergeResolvePolicy.SOURCE => Project(Nil, mergeInto.source)
+              case MergeResolvePolicy.TARGET => Project(Nil, mergeInto.table)
             }
             val resolvedExpr = resolveExprInAssignment(c, resolvePlan)
             val withDefaultResolved = if (conf.enableDefaultColumns) {

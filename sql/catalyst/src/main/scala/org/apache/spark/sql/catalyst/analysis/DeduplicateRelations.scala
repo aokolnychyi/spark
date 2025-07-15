@@ -84,8 +84,8 @@ object DeduplicateRelations extends Rule[LogicalPlan] {
           }
         unionWithChildOutputsDeduplicated.copy(children = newChildren)
       case merge: MergeIntoTable
-          if !merge.duplicateResolved && noMissingInput(merge.sourceTable) =>
-        merge.copy(sourceTable = dedupRight(merge.targetTable, merge.sourceTable))
+          if !merge.duplicateResolved && noMissingInput(merge.source) =>
+        merge.copy(source = dedupRight(merge.table, merge.source))
     }
   }
 

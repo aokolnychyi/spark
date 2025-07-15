@@ -18,9 +18,19 @@
 package org.apache.spark.sql.connector.catalog
 
 import org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException
+import org.apache.spark.sql.connector.catalog.transactions.{Transaction, TransactionInfo}
 
-class InMemoryRowLevelOperationTableCatalog extends InMemoryTableCatalog {
+class InMemoryRowLevelOperationTableCatalog
+    extends InMemoryTableCatalog with TransactionalCatalogPlugin {
   import CatalogV2Implicits._
+
+  var txn: Txn = _
+
+  override def beginTransaction(info: TransactionInfo): Transaction = {
+    assert(txn == null || txn.currentState != Active)
+    this.txn = new Txn(new TxnTableCatalog(this))
+    txn
+  }
 
   override def createTable(ident: Identifier, tableInfo: TableInfo): Table = {
     if (tables.containsKey(ident)) {

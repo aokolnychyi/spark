@@ -22,6 +22,7 @@ import scala.collection.mutable
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.SQLConfHelper
 import org.apache.spark.sql.catalyst.catalog.{SessionCatalog, TempVariableManager}
+import org.apache.spark.sql.catalyst.transactions.ActiveTransaction
 import org.apache.spark.sql.catalyst.util.StringUtils
 import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.internal.SQLConf
@@ -50,11 +51,12 @@ class CatalogManager(
   val tempVariableManager: TempVariableManager = new TempVariableManager
 
   def catalog(name: String): CatalogPlugin = synchronized {
-    if (name.equalsIgnoreCase(SESSION_CATALOG_NAME)) {
+    val catalog = if (name.equalsIgnoreCase(SESSION_CATALOG_NAME)) {
       v2SessionCatalog
     } else {
       catalogs.getOrElseUpdate(name, Catalogs.load(name, conf))
     }
+    resolveTxnCatalog(catalog)
   }
 
   def isCatalogRegistered(name: String): Boolean = {
@@ -85,10 +87,11 @@ class CatalogManager(
    * in the fallback configuration, spark.sql.sources.useV1SourceList
    */
   private[sql] def v2SessionCatalog: CatalogPlugin = {
-    conf.getConf(SQLConf.V2_SESSION_CATALOG_IMPLEMENTATION) match {
+    val catalog = conf.getConf(SQLConf.V2_SESSION_CATALOG_IMPLEMENTATION) match {
       case "builtin" => defaultSessionCatalog
       case _ => catalogs.getOrElseUpdate(SESSION_CATALOG_NAME, loadV2SessionCatalog())
     }
+    resolveTxnCatalog(catalog)
   }
 
   private var _currentNamespace: Option[Array[String]] = None
@@ -155,6 +158,14 @@ class CatalogManager(
     _currentNamespace = None
     _currentCatalogName = None
     v1SessionCatalog.setCurrentDatabase(conf.defaultDatabase)
+  }
+
+  // returns the txn catalog if active and matching or else the original catalog
+  private def resolveTxnCatalog(catalog: CatalogPlugin): CatalogPlugin = {
+    ActiveTransaction.get match {
+      case Some(txn) if txn != null && txn.catalog.name == catalog.name => txn.catalog
+      case _ => catalog
+    }
   }
 }
 

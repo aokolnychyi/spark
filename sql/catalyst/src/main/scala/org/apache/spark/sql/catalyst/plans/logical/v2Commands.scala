@@ -38,7 +38,7 @@ import org.apache.spark.sql.connector.expressions.filter.Predicate
 import org.apache.spark.sql.connector.write.{DeltaWrite, RowLevelOperation, RowLevelOperationTable, SupportsDelta, Write}
 import org.apache.spark.sql.connector.write.RowLevelOperation.Command.{DELETE, MERGE, UPDATE}
 import org.apache.spark.sql.errors.DataTypeErrors.toSQLType
-import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
+import org.apache.spark.sql.execution.datasources.v2.DataSourceV2RelationTable
 import org.apache.spark.sql.types.{BooleanType, DataType, IntegerType, MapType, MetadataBuilder, StringType, StructType}
 import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.Utils
@@ -261,7 +261,7 @@ case class ReplaceData(
 
   lazy val operation: RowLevelOperation = {
     EliminateSubqueryAliases(table) match {
-      case DataSourceV2Relation(RowLevelOperationTable(_, operation), _, _, _, _) =>
+      case DataSourceV2RelationTable(RowLevelOperationTable(_, operation)) =>
         operation
       case _ =>
         throw new AnalysisException(
@@ -343,7 +343,7 @@ case class WriteDelta(
 
   lazy val operation: SupportsDelta = {
     EliminateSubqueryAliases(table) match {
-      case DataSourceV2Relation(RowLevelOperationTable(_, operation), _, _, _, _) =>
+      case DataSourceV2RelationTable(RowLevelOperationTable(_, operation)) =>
         operation.asInstanceOf[SupportsDelta]
       case _ =>
         throw new AnalysisException(
@@ -804,7 +804,8 @@ object DescribeColumn {
  */
 case class DeleteFromTable(
     table: LogicalPlan,
-    condition: Expression) extends UnaryCommand with SupportsSubquery {
+    condition: Expression)
+  extends UnaryCommand with TransactionalWrite with SupportsSubquery {
   override def child: LogicalPlan = table
   override protected def withNewChildInternal(newChild: LogicalPlan): DeleteFromTable =
     copy(table = newChild)
@@ -826,13 +827,14 @@ case class DeleteFromTableWithFilters(
 case class UpdateTable(
     table: LogicalPlan,
     assignments: Seq[Assignment],
-    condition: Option[Expression]) extends UnaryCommand with SupportsSubquery {
+    condition: Option[Expression])
+  extends UnaryCommand with TransactionalWrite with SupportsSubquery {
 
   lazy val aligned: Boolean = AssignmentUtils.aligned(table.output, assignments)
 
   lazy val rewritable: Boolean = {
     EliminateSubqueryAliases(table) match {
-      case DataSourceV2Relation(_: SupportsRowLevelOperations, _, _, _, _) => true
+      case DataSourceV2RelationTable(_: SupportsRowLevelOperations) => true
       case _ => false
     }
   }
@@ -852,48 +854,49 @@ case class UpdateTable(
  * The logical plan of the MERGE INTO command.
  */
 case class MergeIntoTable(
-    targetTable: LogicalPlan,
-    sourceTable: LogicalPlan,
+    table: LogicalPlan,
+    source: LogicalPlan,
     mergeCondition: Expression,
     matchedActions: Seq[MergeAction],
     notMatchedActions: Seq[MergeAction],
     notMatchedBySourceActions: Seq[MergeAction],
-    withSchemaEvolution: Boolean) extends BinaryCommand with SupportsSubquery {
+    withSchemaEvolution: Boolean)
+  extends BinaryCommand with TransactionalWrite with SupportsSubquery {
 
   lazy val aligned: Boolean = {
     val actions = matchedActions ++ notMatchedActions ++ notMatchedBySourceActions
     actions.forall {
       case UpdateAction(_, assignments) =>
-        AssignmentUtils.aligned(targetTable.output, assignments)
+        AssignmentUtils.aligned(table.output, assignments)
       case _: DeleteAction =>
         true
       case InsertAction(_, assignments) =>
-        AssignmentUtils.aligned(targetTable.output, assignments)
+        AssignmentUtils.aligned(table.output, assignments)
       case _ =>
         false
     }
   }
 
   lazy val rewritable: Boolean = {
-    EliminateSubqueryAliases(targetTable) match {
-      case DataSourceV2Relation(_: SupportsRowLevelOperations, _, _, _, _) => true
+    EliminateSubqueryAliases(table) match {
+      case DataSourceV2RelationTable(_: SupportsRowLevelOperations) => true
       case _ => false
     }
   }
 
-  def duplicateResolved: Boolean = targetTable.outputSet.intersect(sourceTable.outputSet).isEmpty
+  def duplicateResolved: Boolean = table.outputSet.intersect(source.outputSet).isEmpty
 
-  def skipSchemaResolution: Boolean = targetTable match {
+  def skipSchemaResolution: Boolean = table match {
     case r: NamedRelation => r.skipSchemaResolution
     case SubqueryAlias(_, r: NamedRelation) => r.skipSchemaResolution
     case _ => false
   }
 
-  override def left: LogicalPlan = targetTable
-  override def right: LogicalPlan = sourceTable
+  override def left: LogicalPlan = table
+  override def right: LogicalPlan = source
   override protected def withNewChildrenInternal(
       newLeft: LogicalPlan, newRight: LogicalPlan): MergeIntoTable =
-    copy(targetTable = newLeft, sourceTable = newRight)
+    copy(table = newLeft, source = newRight)
 }
 
 object MergeIntoTable {
@@ -972,6 +975,10 @@ case class Assignment(key: Expression, value: Expression) extends Expression
   override def sql: String = s"${key.sql} = ${value.sql}"
   override protected def withNewChildrenInternal(
     newLeft: Expression, newRight: Expression): Assignment = copy(key = newLeft, value = newRight)
+}
+
+trait TransactionalWrite extends LogicalPlan {
+  def table: LogicalPlan
 }
 
 /**

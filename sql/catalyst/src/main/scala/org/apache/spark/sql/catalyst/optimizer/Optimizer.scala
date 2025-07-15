@@ -358,7 +358,14 @@ abstract class Optimizer(catalogManager: CatalogManager)
         case other => other
       }
     }
-    def apply(plan: LogicalPlan): LogicalPlan = plan.transformAllExpressionsWithPruning(
+
+    def apply(plan: LogicalPlan): LogicalPlan = plan match {
+      case wd: WriteDelta => wd.copy(query = optimize(wd.query))
+      case rd: ReplaceData => rd.copy(query = optimize(rd.query))
+      case _ => optimize(plan)
+    }
+
+    private def optimize(plan: LogicalPlan): LogicalPlan = plan.transformAllExpressionsWithPruning(
       _.containsPattern(PLAN_EXPRESSION), ruleId) {
       // Do not optimize DPP subquery, as it was created from optimized plan and we should not
       // optimize it again, to save optimization time and avoid breaking broadcast/subquery reuse.

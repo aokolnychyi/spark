@@ -51,10 +51,10 @@ object ResolveRowLevelCommandAssignments extends Rule[LogicalPlan] {
     case m: MergeIntoTable if !m.skipSchemaResolution && m.resolved && m.rewritable && !m.aligned =>
       validateStoreAssignmentPolicy()
       m.copy(
-        targetTable = cleanAttrMetadata(m.targetTable),
-        matchedActions = alignActions(m.targetTable.output, m.matchedActions),
-        notMatchedActions = alignActions(m.targetTable.output, m.notMatchedActions),
-        notMatchedBySourceActions = alignActions(m.targetTable.output, m.notMatchedBySourceActions))
+        table = cleanAttrMetadata(m.table),
+        matchedActions = alignActions(m.table.output, m.matchedActions),
+        notMatchedActions = alignActions(m.table.output, m.notMatchedActions),
+        notMatchedBySourceActions = alignActions(m.table.output, m.notMatchedBySourceActions))
 
     case m: MergeIntoTable if !m.skipSchemaResolution && m.resolved && !m.aligned =>
       resolveAssignments(m)

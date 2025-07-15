@@ -60,13 +60,21 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
 
   private def hadoopConf = session.sessionState.newHadoopConf()
 
+  private def cacheManager = session.sharedState.cacheManager
+
   private def refreshCache(r: DataSourceV2Relation)(): Unit = {
-    session.sharedState.cacheManager.recacheByPlan(session, r)
+    (r.catalog, r.identifier) match {
+      case (Some(catalog), Some(ident)) =>
+        val nameParts = ident.toQualifiedNameParts(catalog)
+        cacheManager.recacheByTableName(session, nameParts, includeTimeTravel = false)
+      case _ =>
+        cacheManager.recacheByPlan(session, r)
+    }
   }
 
   private def recacheTable(r: ResolvedTable)(): Unit = {
-    val v2Relation = DataSourceV2Relation.create(r.table, Some(r.catalog), Some(r.identifier))
-    session.sharedState.cacheManager.recacheByPlan(session, v2Relation)
+    val nameParts = r.identifier.toQualifiedNameParts(r.catalog)
+    cacheManager.recacheByTableName(session, nameParts, includeTimeTravel = false)
   }
 
   // Invalidates the cache associated with the given table. If the invalidated cache matches the
@@ -263,7 +271,7 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
             invalidateCache) :: Nil
       }
 
-    case AppendData(r @ DataSourceV2Relation(v1: SupportsWrite, _, _, _, _), _, _,
+    case AppendData(r @ DataSourceV2RelationTable(v1: SupportsWrite), _, _,
         _, Some(write), analyzedQuery) if v1.supports(TableCapability.V1_BATCH_WRITE) =>
       write match {
         case v1Write: V1Write =>
@@ -277,7 +285,7 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
     case AppendData(r: DataSourceV2Relation, query, _, _, Some(write), _) =>
       AppendDataExec(planLater(query), refreshCache(r), write) :: Nil
 
-    case OverwriteByExpression(r @ DataSourceV2Relation(v1: SupportsWrite, _, _, _, _), _, _,
+    case OverwriteByExpression(r @ DataSourceV2RelationTable(v1: SupportsWrite), _, _,
         _, _, Some(write), analyzedQuery) if v1.supports(TableCapability.V1_BATCH_WRITE) =>
       write match {
         case v1Write: V1Write =>

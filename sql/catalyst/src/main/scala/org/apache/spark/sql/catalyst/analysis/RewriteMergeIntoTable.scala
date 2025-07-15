@@ -29,7 +29,7 @@ import org.apache.spark.sql.connector.catalog.SupportsRowLevelOperations
 import org.apache.spark.sql.connector.write.{RowLevelOperationTable, SupportsDelta}
 import org.apache.spark.sql.connector.write.RowLevelOperation.Command.MERGE
 import org.apache.spark.sql.errors.QueryCompilationErrors
-import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
+import org.apache.spark.sql.execution.datasources.v2.{DataSourceV2Relation, DataSourceV2RelationTable}
 import org.apache.spark.sql.types.IntegerType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
@@ -123,7 +123,7 @@ object RewriteMergeIntoTable extends RewriteRowLevelCommand with PredicateHelper
         notMatchedBySourceActions, _) if m.resolved && m.rewritable && m.aligned =>
 
       EliminateSubqueryAliases(aliasedTable) match {
-        case r @ DataSourceV2Relation(tbl: SupportsRowLevelOperations, _, _, _, _) =>
+        case r @ DataSourceV2RelationTable(tbl: SupportsRowLevelOperations) =>
           validateMergeIntoConditions(m)
           val table = buildOperationTable(tbl, MERGE, CaseInsensitiveStringMap.empty())
           table.operation match {
@@ -173,7 +173,7 @@ object RewriteMergeIntoTable extends RewriteRowLevelCommand with PredicateHelper
     // predicates of the ON condition can be used to filter the target table (planning & runtime)
     // only if there is no NOT MATCHED BY SOURCE clause
     val (pushableCond, groupFilterCond) = if (notMatchedBySourceActions.isEmpty) {
-      (cond, Some(toGroupFilterCondition(relation, source, cond)))
+      (cond, buildGroupFilterCondition(relation, source, cond))
     } else {
       (TrueLiteral, None)
     }
@@ -232,6 +232,18 @@ object RewriteMergeIntoTable extends RewriteRowLevelCommand with PredicateHelper
       checkCardinality = checkCardinality,
       output = generateExpandOutput(attrs, outputs),
       joinPlan)
+  }
+
+  private def buildGroupFilterCondition(
+      relation: DataSourceV2Relation,
+      source: LogicalPlan,
+      cond: Expression): Option[Expression] = {
+
+    if (conf.runtimeRowLevelOperationGroupFilterEnabled) {
+      Some(toGroupFilterCondition(relation, source, cond))
+    } else {
+      None
+    }
   }
 
   // converts a MERGE condition into an EXISTS subquery for runtime filtering

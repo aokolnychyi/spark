@@ -86,6 +86,8 @@ abstract class InMemoryBaseTable(
     validatedTableVersion = version
   }
 
+  protected def recordScanEvent(filters: Array[Filter]): Unit = {}
+
   protected object PartitionKeyColumn extends MetadataColumn {
     override def name: String = "_partition"
     override def dataType: DataType = StringType
@@ -369,6 +371,7 @@ abstract class InMemoryBaseTable(
       if (evaluableFilters.nonEmpty) {
         scan.filter(evaluableFilters)
       }
+      recordScanEvent(_pushedFilters)
       scan
     }
 

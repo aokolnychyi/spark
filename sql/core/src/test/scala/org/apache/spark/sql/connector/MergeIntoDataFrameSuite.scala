@@ -17,13 +17,77 @@
 
 package org.apache.spark.sql.connector
 
-import org.apache.spark.sql.Row
+import org.apache.spark.sql.{sources, Column, Row}
 import org.apache.spark.sql.classic.MergeIntoWriter
+import org.apache.spark.sql.connector.catalog.Committed
 import org.apache.spark.sql.functions._
 
 class MergeIntoDataFrameSuite extends RowLevelOperationSuiteBase {
 
   import testImplicits._
+
+  private def targetTableCol(colName: String): Column = {
+    col(tableNameAsString + "." + colName)
+  }
+
+  test("self merge with transactional checks") {
+    // create table
+    createAndInitTable("pk INT NOT NULL, salary INT, dep STRING",
+      """{ "pk": 1, "salary": 100, "dep": "hr" }
+        |{ "pk": 2, "salary": 200, "dep": "software" }
+        |{ "pk": 3, "salary": 300, "dep": "hr" }
+        |""".stripMargin)
+
+    // create a source on top of itself that will be fully resolved and analyzed
+    val sourceDF = spark.table(tableNameAsString)
+      .where("salary == 100")
+      .as("source")
+    sourceDF.queryExecution.assertAnalyzed()
+
+    // merge into table using the source on top of itself
+    val (txn, txnTables) = executeTransaction {
+      sourceDF
+        .mergeInto(
+          tableNameAsString,
+          $"source.pk" === targetTableCol("pk") && targetTableCol("dep") === "hr")
+        .whenMatched()
+        .update(Map("salary" -> targetTableCol("salary").plus(1)))
+        .whenNotMatched()
+        .insertAll()
+        .merge()
+    }
+
+    // check txn was properly committed and closed
+    assert(txn.currentState == Committed)
+    assert(txn.isClosed)
+    assert(txnTables.size == 1)
+
+    // check all table scans
+    val targetTxnTable = txnTables(tableNameAsString)
+    assert(targetTxnTable.scanEvents.size == 4)
+
+    // check table scans as MERGE target
+    val numTargetScans = targetTxnTable.scanEvents.flatten.count {
+      case sources.EqualTo("dep", "hr") => true
+      case _ => false
+    }
+    assert(numTargetScans == 2)
+
+    // check table scans as MERGE source
+    val numSourceScans = targetTxnTable.scanEvents.flatten.count {
+      case sources.EqualTo("salary", 100) => true
+      case _ => false
+    }
+    assert(numSourceScans == 2)
+
+    // check txn state was propagated correctly
+    checkAnswer(
+      sql(s"SELECT * FROM $tableNameAsString"),
+      Seq(
+        Row(1, 101, "hr"), // update
+        Row(2, 200, "software"), // unchanged
+        Row(3, 300, "hr"))) // unchanged
+  }
 
   test("merge into empty table with NOT MATCHED clause") {
     withTempView("source") {

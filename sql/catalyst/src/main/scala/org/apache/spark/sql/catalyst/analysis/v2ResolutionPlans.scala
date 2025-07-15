@@ -21,16 +21,17 @@ import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.catalog.CatalogTable
 import org.apache.spark.sql.catalyst.catalog.CatalogTypes.TablePartitionSpec
-import org.apache.spark.sql.catalyst.expressions.{Attribute, LeafExpression, Unevaluable}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, LeafExpression, Unevaluable}
 import org.apache.spark.sql.catalyst.plans.logical.{LeafNode, Statistics}
 import org.apache.spark.sql.catalyst.trees.TreePattern.{TreePattern, UNRESOLVED_FUNC, UNRESOLVED_PROCEDURE}
 import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
-import org.apache.spark.sql.catalyst.util.CharVarcharUtils
+import org.apache.spark.sql.catalyst.util.{truncatedString, CharVarcharUtils}
 import org.apache.spark.sql.connector.catalog.{CatalogPlugin, FunctionCatalog, Identifier, ProcedureCatalog, Table, TableCatalog}
 import org.apache.spark.sql.connector.catalog.CatalogV2Implicits._
 import org.apache.spark.sql.connector.catalog.TableChange.ColumnPosition
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction
 import org.apache.spark.sql.connector.catalog.procedures.Procedure
+import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 import org.apache.spark.sql.types.{DataType, StructField}
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.util.ArrayImplicits._
@@ -185,6 +186,45 @@ object ResolvedTable {
       table: Table): ResolvedTable = {
     val schema = CharVarcharUtils.replaceCharVarcharWithStringInSchema(table.columns.asSchema)
     ResolvedTable(catalog, identifier, table, toAttributes(schema))
+  }
+}
+
+case class TableReference private(
+    catalog: TableCatalog,
+    identifier: Identifier,
+    output: Seq[AttributeReference],
+    options: CaseInsensitiveStringMap)
+  extends LeafNode with MultiInstanceRelation with NamedRelation {
+
+  override def name: String = {
+    s"${catalog.name()}.${identifier.quoted}"
+  }
+
+  override def newInstance(): TableReference = {
+    copy(output = output.map(_.newInstance()))
+  }
+
+  override def computeStats(): Statistics = Statistics.DUMMY
+
+  override def simpleString(maxFields: Int): String = {
+    val outputString = truncatedString(output, "[", ", ", "]", maxFields)
+    s"TableReference$outputString $name"
+  }
+
+  def toRelation(table: Table): DataSourceV2Relation = {
+    DataSourceV2Relation(table, output, Some(catalog), Some(identifier), options)
+  }
+}
+
+object TableReference {
+  def create(relation: DataSourceV2Relation): TableReference = {
+    val tableReference = TableReference(
+      relation.catalog.get.asTableCatalog,
+      relation.identifier.get,
+      relation.output,
+      relation.options)
+    tableReference.copyTagsFrom(relation)
+    tableReference
   }
 }
 

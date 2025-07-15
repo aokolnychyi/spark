@@ -1885,8 +1885,8 @@ class PlanResolutionSuite extends SharedSparkSession with AnalysisTest {
            """.stripMargin
         parseAndResolve(sql6) match {
           case m: MergeIntoTable =>
-            val source = m.sourceTable
-            val target = m.targetTable
+            val source = m.source
+            val target = m.table
             val ti = target.output.find(_.name == "i").get.asInstanceOf[AttributeReference]
             val si = source.output.find(_.name == "i").get.asInstanceOf[AttributeReference]
             m.mergeCondition match {
@@ -2092,7 +2092,7 @@ class PlanResolutionSuite extends SharedSparkSession with AnalysisTest {
         |""".stripMargin
     parseAndResolve(mergeIntoTableWithColumnNamedDefault, withDefault = true) match {
       case m: MergeIntoTable =>
-        val target = m.targetTable
+        val target = m.table
         val d = target.output.find(_.name == "default").get.asInstanceOf[AttributeReference]
         m.mergeCondition match {
           case EqualTo(Cast(l: AttributeReference, _, _, _), _) =>
@@ -2303,8 +2303,8 @@ class PlanResolutionSuite extends SharedSparkSession with AnalysisTest {
     val parsed = parseAndResolve(sql1)
     parsed match {
       case u: MergeIntoTable =>
-        assert(u.targetTable.isInstanceOf[UnresolvedRelation])
-        assert(u.sourceTable.isInstanceOf[UnresolvedRelation])
+        assert(u.table.isInstanceOf[UnresolvedRelation])
+        assert(u.source.isInstanceOf[UnresolvedRelation])
         assert(u.withSchemaEvolution === false)
       case _ => fail("Expect MergeIntoTable, but got:\n" + parsed.treeString)
     }
